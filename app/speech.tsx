@@ -7,22 +7,34 @@ export default function SpeechQuestion() {
 const handleChoice = (isImpaired: boolean) => {
   if (!language) return;
 
+  const isImpairedStr = isImpaired ? 'true' : 'false';
+
   if (language === 'Akan') {
     if (isImpaired) {
-      router.push({ pathname: '/record', params: { model: 'whisper', language } });
+      router.push({
+        pathname: '/record',
+        params: { model: 'whisper', language, isImpaired: isImpairedStr },
+      });
     } else {
-      router.push({ pathname: '/model', params: { language } });
+      router.push({
+        pathname: '/model',
+        params: { language, isImpaired: isImpairedStr },
+      });
     }
   } else if (language === 'Ewe') {
     if (isImpaired) {
       alert('Speech-impaired model for Ewe is not available yet.');
     } else {
-      router.push({ pathname: '/record', params: { model: 'wav2vec', language } });
+      router.push({
+        pathname: '/record',
+        params: { model: 'wav2vec', language, isImpaired: isImpairedStr },
+      });
     }
   } else {
     alert('Model for this language is still in production.');
   }
 };
+
 
 
 

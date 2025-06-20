@@ -1,19 +1,19 @@
 import { FontAwesome } from '@expo/vector-icons';
 import {
-    AudioModule,
-    RecordingPresets,
-    useAudioPlayer,
-    useAudioRecorder,
+  AudioModule,
+  RecordingPresets,
+  useAudioPlayer,
+  useAudioRecorder,
 } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import PulseWave from '../components/PulseWave';
 import Colors from '../constants/Colors';
@@ -28,10 +28,11 @@ export default function Recorder() {
   const player = useAudioPlayer(recordedUri ?? undefined);
   const [recordingTime, setRecordingTime] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const { language, model } = useLocalSearchParams<{ language: string; model: string }>();
+  const { language, model, isImpaired } = useLocalSearchParams<{ language: string; model: string; isImpaired?: string}>();
 
 console.log('Language:', language);
   console.log('Model:', model);
+  console.log('Is Impaired:', isImpaired);
 
 useEffect(() => {
   let interval: NodeJS.Timer | null = null;

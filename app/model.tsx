@@ -2,7 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ModelScreen() {
-  const { language } = useLocalSearchParams<{ language: string }>();
+  const { language, isImpaired } = useLocalSearchParams<{
+    language: string;
+    isImpaired?: string;
+  }>();
   const isAvailable = ['Akan', 'Ewe'].includes(language || '');
 
   return (
@@ -10,10 +13,27 @@ export default function ModelScreen() {
       <Text style={styles.title}>Model for {language}</Text>
       {isAvailable ? (
         <>
-          <TouchableOpacity style={styles.button} onPress={() => router.push({ pathname: '/record', params: { model: 'wav2vec', language } })}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() =>
+              router.push({
+                pathname: '/record',
+                params: { model: 'wav2vec', language, isImpaired },
+              })
+            }
+          >
             <Text style={styles.buttonText}>Use wav2vec</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => router.push({ pathname: '/record', params: { model: 'whisper', language } })}>
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() =>
+              router.push({
+                pathname: '/record',
+                params: { model: 'whisper', language, isImpaired },
+              })
+            }
+          >
             <Text style={styles.buttonText}>Use Whisper</Text>
           </TouchableOpacity>
         </>
