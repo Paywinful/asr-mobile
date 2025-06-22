@@ -1,7 +1,11 @@
 import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import Recorder from '../components/Recorder';
+
+const Width = Dimensions.get('window').width
+const Height = Dimensions.get('window').height
+
 
 export default function RecordScreen() {
   const { language, model, isImpaired } = useLocalSearchParams<{
@@ -33,8 +37,8 @@ export default function RecordScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5faff' },
-  header: { padding: 24, alignItems: 'center' },
+  header: { padding:Height * 0.025, alignItems: 'center' },
   title: { fontSize: 24, fontWeight: 'bold', color: '#2e86de' },
-  subTitle: { fontSize: 16, color: '#555', marginTop: 4 },
+  subTitle: { fontSize: 16, color: '#555', marginTop:Height * 0.004 },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });

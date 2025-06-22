@@ -10,14 +10,19 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import PulseWave from '../components/PulseWave';
 import Colors from '../constants/Colors';
 import { saveTranscript } from '../store/historyStorage';
+
+const Width = Dimensions.get('window').width
+const Height = Dimensions.get('window').height
+
 
 
 export default function Recorder() {
@@ -92,8 +97,9 @@ useEffect(() => {
   } as any);
   formData.append('language', language);
   formData.append('model', model);
+  formData.append('isImpaired', isImpaired);
 
-  const response = await fetch('http://192.168.100.26:8000/upload', {
+  const response = await fetch('https://1ddf-197-255-124-84.ngrok-free.app/upload', {
     method: 'POST',
     body: formData,
     headers: {
@@ -208,37 +214,37 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding:Height * 0.024,
   },
   micWrapper: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Height * 0.016,
   },
   micButton: {
     backgroundColor: Colors.primary,
-    width: 100,
-    height: 100,
+    width: Width * 0.25,
+    height:Height * 0.12,
     borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
   },
   statusText: {
-    marginTop: 20,
+    marginTop:Height * 0.20,
     fontSize: 16,
     color: Colors.text,
     textAlign: 'center',
   },
   playerControls: {
-    marginTop: 30,
+    marginTop:Height * 0.030,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingVertical:Height * 0.01,
+    paddingHorizontal:Width * 0.04,
     borderRadius: 8,
     marginBottom: 16,
   },
@@ -249,8 +255,8 @@ const styles = StyleSheet.create({
   },
   transcribeButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
+    paddingVertical:Height * 0.012,
+    paddingHorizontal:Width * 0.05,
     borderRadius: 10,
   },
   transcribeText: {
@@ -264,12 +270,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop:Height * 0.012,
     fontSize: 16,
     color: Colors.primary,
   },
   timerText: {
-  marginTop: 20,
+  marginTop:Height * 0.020,
   fontSize: 28,
   fontWeight: '600',
   color: Colors.primary,

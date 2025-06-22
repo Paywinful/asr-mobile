@@ -1,5 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+
+const Width = Dimensions.get('window').width
+const Height = Dimensions.get('window').height
+
 
 export default function SpeechQuestion() {
   const { language } = useLocalSearchParams();
@@ -54,7 +59,7 @@ const handleChoice = (isImpaired: boolean) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5faff' },
-  title: { fontSize: 24, marginBottom: 30, fontWeight: 'bold', color: '#2e86de', textAlign: 'center' },
-  button: { backgroundColor: '#2e86de', padding: 16, borderRadius: 12, marginBottom: 10, width: '80%' },
+  title: { fontSize: 24, marginBottom:Height * 0.030, fontWeight: 'bold', color: '#2e86de', textAlign: 'center' },
+  button: { backgroundColor: '#2e86de', padding: 16, borderRadius: 12, marginBottom: 10, width: Width * 0.8 },
   buttonText: { color: '#fff', fontSize: 18, textAlign: 'center' },
 });
