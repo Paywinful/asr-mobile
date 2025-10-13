@@ -12,14 +12,14 @@ export default function Splash() {
 
   return (
     <View style={styles.container}>
-      <Image source={require('../assets/images/splash-icon.png')} style={styles.logo} />
-      <Text style={styles.text}>VoiceTranscribe</Text>
+      <Image source={require('../assets/images/logo.png')} style={styles.logo} />
+      <Text style={styles.text}>UG VoiceTranscribe</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2e86de' },
-  logo: { width: 100, height: 100, marginBottom: 20 },
+  logo: { width: 100, height: 100, marginBottom: 20, borderRadius: 10 },
   text: { fontSize: 28, color: 'white', fontWeight: 'bold' },
 });

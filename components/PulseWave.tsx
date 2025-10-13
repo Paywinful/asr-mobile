@@ -1,12 +1,13 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
+import Colors from '../constants/Colors';
 
 type Props = {
   isRecording: boolean;
@@ -28,7 +29,7 @@ export default function PulseWave({ isRecording }: Props) {
     } else {
       scale.value = withTiming(1, { duration: 300 });
     }
-  }, [isRecording]);
+  }, [isRecording, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -44,6 +45,6 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
   },
 });

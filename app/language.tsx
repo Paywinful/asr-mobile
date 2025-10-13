@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const languages = ['Akan', 'Ewe', 'Dagbani', 'Dagaare', 'Ikposo'];
+const languages = ['AKAN', 'EWE', 'DAGBANI', 'DAGAARE', 'IKPOSO'];
 
 const Width = Dimensions.get('window').width
 const Height = Dimensions.get('window').height
 
 const handleLanguageSelect = (lang: string) => {
-  const availableLanguages = ['Akan', 'Ewe'];
+  const availableLanguages = ['AKAN', 'EWE'];
   if (availableLanguages.includes(lang)) {
     router.push({ pathname: '/speech', params: { language: lang } });
   } else {
-    alert('Model for ' + lang + ' is still in production.');
+    alert('Model for ' + lang + ' is still in development.');
   }
 };
 
@@ -39,19 +39,20 @@ export default function LanguageScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5faff' },
-  title: { fontSize: 24, marginBottom: Height * 0.035, fontWeight: 'bold', color: '#2e86de' },
-  button: { backgroundColor: '#2e86de', padding: Height * 0.016, borderRadius: 12, marginBottom: 10, width: Width * 0.8 },
-  buttonText: { color: '#fff', fontSize: 18, textAlign: 'center' },
+  title: { fontSize:Height*0.035, marginBottom: Height * 0.035, fontWeight: 'bold', color: '#2e86de' },
+  button: { backgroundColor: '#2e86de', padding: Height * 0.016, borderRadius: 12, marginBottom: 10, width: Width * 0.8, },
+  buttonText: { color: '#fff', fontSize:Height*0.038, textAlign: 'center' },
   historyBtn: {
     position: 'absolute',
     top:Height * 0.07,
     right: 20,
-    padding: 8,
+    padding: Width * 0.04,
     borderRadius: 8,
     backgroundColor: '#dff1ff',
   },
   historyText: {
     color: '#2e86de',
     fontWeight: '600',
+    fontSize:Height*0.02
   },
 });

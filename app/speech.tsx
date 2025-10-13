@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Colors from '../constants/Colors';
 
-
-const Width = Dimensions.get('window').width
-const Height = Dimensions.get('window').height
+const Width = Dimensions.get('window').width;
+const Height = Dimensions.get('window').height;
 
 
 export default function SpeechQuestion() {
@@ -14,19 +14,19 @@ const handleChoice = (isImpaired: boolean) => {
 
   const isImpairedStr = isImpaired ? 'true' : 'false';
 
-  if (language === 'Akan') {
-    if (isImpaired) {
-      router.push({
-        pathname: '/record',
-        params: { model: 'whisper', language, isImpaired: isImpairedStr },
-      });
-    } else {
-      router.push({
-        pathname: '/model',
-        params: { language, isImpaired: isImpairedStr },
-      });
-    }
-  } else if (language === 'Ewe') {
+if (language === 'AKAN') {
+  if (isImpaired) {
+    router.push({
+      pathname: '/etiology',
+      params: { language, isImpaired: isImpairedStr },
+    });
+  } else {
+    router.push({
+      pathname: '/model',
+      params: { language, isImpaired: isImpairedStr },
+    });
+  }
+} else if (language === 'EWE') {
     if (isImpaired) {
       alert('Speech-impaired model for Ewe is not available yet.');
     } else {
@@ -58,8 +58,30 @@ const handleChoice = (isImpaired: boolean) => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5faff' },
-  title: { fontSize: 24, marginBottom:Height * 0.030, fontWeight: 'bold', color: '#2e86de', textAlign: 'center' },
-  button: { backgroundColor: '#2e86de', padding: 16, borderRadius: 12, marginBottom: 10, width: Width * 0.8 },
-  buttonText: { color: '#fff', fontSize: 18, textAlign: 'center' },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    paddingHorizontal: Width * 0.1,
+  },
+  title: {
+    marginBottom: Height * 0.03,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    textAlign: 'center',
+    fontSize: Height * 0.035,
+  },
+  button: {
+    backgroundColor: Colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 10,
+    width: Width * 0.8,
+  },
+  buttonText: {
+    color: Colors.white,
+    textAlign: 'center',
+    fontSize: Height * 0.038,
+  },
 });
