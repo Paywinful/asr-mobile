@@ -15,5 +15,6 @@ export const buildTranscriptionUrl = (
   const base = useNonStandard
     ? TRANSCRIPTION_ENDPOINT_NON_STANDARD
     : TRANSCRIPTION_ENDPOINT_STANDARD;
+  console.log(`${base}?model_name=${encodeURIComponent(modelName)}`)
   return `${base}?model_name=${encodeURIComponent(modelName)}`;
 };

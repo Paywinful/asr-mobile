@@ -1,7 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons';
+import type { AudioMode, RecordingOptions } from 'expo-audio';
 import {
   AudioModule,
-  RecordingPresets,
+  AudioQuality,
+  IOSOutputFormat,
   useAudioPlayer,
   useAudioRecorder,
 } from 'expo-audio';
@@ -11,6 +13,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -21,8 +24,8 @@ import {
   TRANSCRIPTION_TIMEOUT_MS,
   buildTranscriptionUrl,
 } from '../constants/api';
-import PulseWave from './PulseWave';
 import { saveTranscript } from '../store/historyStorage';
+import PulseWave from './PulseWave';
 
 type RecorderProps = {
   language: string;
@@ -33,6 +36,59 @@ type RecorderProps = {
 
 const Width = Dimensions.get('window').width;
 const Height = Dimensions.get('window').height;
+
+// Force a consistent 16 kHz mono capture so the ASR backend receives the expected format.
+const RECORDING_OPTIONS_16K: RecordingOptions = {
+  extension: '.m4a',
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 64000,
+  android: {
+    extension: '.m4a',
+    sampleRate: 16000,
+    outputFormat: 'mpeg4',
+    audioEncoder: 'aac',
+  },
+  ios: {
+    extension: '.m4a',
+    sampleRate: 16000,
+    outputFormat: IOSOutputFormat.MPEG4AAC,
+    audioQuality: AudioQuality.HIGH,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/webm',
+    bitsPerSecond: 64000,
+  },
+};
+
+const buildAudioModeConfig = (shouldRecord: boolean): Partial<AudioMode> => {
+  const common: Partial<AudioMode> = {
+    allowsRecording: shouldRecord,
+    playsInSilentMode: shouldRecord,
+    shouldPlayInBackground: false,
+  };
+
+  if (Platform.OS === 'ios') {
+    return {
+      ...common,
+      interruptionMode: 'mixWithOthers',
+    };
+  }
+
+  if (Platform.OS === 'android') {
+    return {
+      ...common,
+      playsInSilentMode: false,
+      shouldRouteThroughEarpiece: false,
+      interruptionModeAndroid: shouldRecord ? 'duckOthers' : 'doNotMix',
+    };
+  }
+
+  return common;
+};
 
 const resolveMimeType = (uri: string) => {
   const extension = uri.split('.').pop()?.toLowerCase();
@@ -48,7 +104,7 @@ export default function Recorder({
   isImpaired = false,
   etiology,
 }: RecorderProps) {
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const audioRecorder = useAudioRecorder(RECORDING_OPTIONS_16K);
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -60,24 +116,49 @@ export default function Recorder({
     [etiology, isImpaired],
   );
   const targetModel = useMemo(() => {
+    if(model=='whisper'){
+      model='lg'
+    }
     const trimmed = typeof model === 'string' ? model.trim() : '';
-    return trimmed.length > 0 ? trimmed : 'default';
+    console.log('the model name',trimmed)
+    return trimmed.length > 0 ? trimmed : 'lg';
   }, [model]);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const status = await AudioModule.requestRecordingPermissionsAsync();
-      if (!status.granted && !cancelled) {
-        Alert.alert(
-          'Permission Required',
-          'Microphone access is needed to record audio.',
-        );
+
+    const configureAudioSession = async () => {
+      try {
+        const status = await AudioModule.requestRecordingPermissionsAsync();
+        if (!status.granted) {
+          if (!cancelled) {
+            Alert.alert(
+              'Permission Required',
+              'Microphone access is needed to record audio.',
+            );
+          }
+          return;
+        }
+
+        await AudioModule.setAudioModeAsync(buildAudioModeConfig(true));
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to configure audio for recording', error);
+          Alert.alert(
+            'Audio Setup Failed',
+            'Unable to configure audio for recording. Please try again.',
+          );
+        }
       }
-    })();
+    };
+
+    configureAudioSession();
 
     return () => {
       cancelled = true;
+      AudioModule.setAudioModeAsync(buildAudioModeConfig(false)).catch(() => {
+        // ignore cleanup errors
+      });
     };
   }, []);
 
@@ -166,7 +247,9 @@ export default function Recorder({
         });
 
         if (!response.ok) {
-          throw new Error(`Upload failed with status ${response.status}`);
+          const errorText = await response.text().catch(() => '');
+          const details = errorText ? `: ${errorText}` : '';
+          throw new Error(`Upload failed with status ${response.status}${details}`);
         }
 
         return await response.json();
@@ -189,17 +272,23 @@ export default function Recorder({
     try {
       setLoading(true);
       const data = await uploadAudio(recordedUri);
+      console.log('Transcription response', data);
 
-      if (!data?.transcription) {
+      const transcription =
+        (data as any)?.transcription ??
+        (data as any)?.text ??
+        (data as any)?.result;
+
+      if (!transcription) {
         throw new Error('Transcription missing in response.');
       }
 
-      await saveTranscript(data.transcription);
+      await saveTranscript(transcription);
 
       router.replace({
         pathname: '/result',
         params: {
-          transcript: data.transcription,
+          transcript: transcription,
           language,
           model: targetModel,
           audioUri: recordedUri,
