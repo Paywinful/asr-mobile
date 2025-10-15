@@ -1,21 +1,32 @@
 import { FontAwesome } from '@expo/vector-icons';
-import { useAudioPlayer } from 'expo-audio';
+import { AudioModule, useAudioPlayer, type AudioMode } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 import {
   Alert,
   Dimensions,
   Linking,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import TtsSection from '../components/TtsSection';
 import Colors from '../constants/Colors';
 
 const Width = Dimensions.get('window').width;
 const Height = Dimensions.get('window').height;
+
+const buildPlaybackAudioMode = (): Partial<AudioMode> => ({
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: false,
+  ...(Platform.OS === 'ios'
+    ? { interruptionMode: 'mixWithOthers' as const }
+    : { interruptionModeAndroid: 'duckOthers' as const }),
+});
 
 export default function ResultScreen() {
   const params = useLocalSearchParams<{
@@ -69,6 +80,7 @@ export default function ResultScreen() {
     }
 
     try {
+      await AudioModule.setAudioModeAsync(buildPlaybackAudioMode());
       await player.play();
     } catch (error) {
       console.error('Playback error:', error);
@@ -83,6 +95,7 @@ export default function ResultScreen() {
     }
 
     try {
+      await AudioModule.setAudioModeAsync(buildPlaybackAudioMode());
       await player.seekTo(0);
       await player.play();
     } catch (error) {
@@ -105,119 +118,170 @@ export default function ResultScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Transcription</Text>
-      <Text style={styles.transcript}>{transcript}</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.card}>
+        <Text style={styles.overline}>Transcription ready</Text>
+        <Text style={styles.transcript}>{transcript}</Text>
 
-      <View style={styles.metadata}>
-        <Text style={styles.metaText}>Language: {language}</Text>
-        <Text style={styles.metaText}>Model: {model}</Text>
-        {etiology ? (
-          <Text style={styles.metaText}>Etiology: {etiology}</Text>
-        ) : null}
-      </View>
-
-      {audioUri && (
-        <View style={styles.audioControls}>
-          <TouchableOpacity onPress={handlePlay} style={styles.playButton}>
-            <FontAwesome name="play" size={16} color={Colors.white} />
-            <Text style={styles.playText}>Play</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleReplay} style={styles.playButton}>
-            <FontAwesome name="undo" size={16} color={Colors.white} />
-            <Text style={styles.playText}>Replay</Text>
-          </TouchableOpacity>
+        <View style={styles.metadata}>
+          <View style={styles.metaChip}>
+            <Text style={styles.metaChipLabel}>{language}</Text>
+          </View>
+          {/* <View style={styles.metaChip}>
+            <Text style={styles.metaChipLabel}>{model}</Text>
+          </View> */}
+          {etiology ? (
+            <View style={styles.metaChip}>
+              <Text style={styles.metaChipLabel}>Etiology: {etiology}</Text>
+            </View>
+          ) : null}
         </View>
-      )}
+
+        {audioUri ? (
+          <View style={styles.audioControls}>
+            <TouchableOpacity
+              onPress={handlePlay}
+              style={[styles.audioBtn, styles.audioBtnPrimary]}
+            >
+              <FontAwesome name="play" size={16} color={Colors.white} />
+              <Text style={styles.audioBtnLabel}>Play back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleReplay}
+              style={[styles.audioBtn, styles.audioBtnSecondary]}
+            >
+              <FontAwesome name="undo" size={16} color={Colors.text} />
+              <Text style={[styles.audioBtnLabel, styles.audioBtnLabelAlt]}>
+                Restart
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.audioNotice}>
+            No audio was attached to this transcription.
+          </Text>
+        )}
+      </View>
 
       <TtsSection transcript={transcript} />
 
-      <TouchableOpacity style={styles.button} onPress={handleRecordAnother}>
-        <Text style={styles.buttonText}>Record Another</Text>
+      <TouchableOpacity
+        style={styles.primaryAction}
+        onPress={handleRecordAnother}
+      >
+        <Text style={styles.primaryActionLabel}>Record another sample</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={openQuestionnaire}>
-        <Text style={styles.questionnaire}>
-          Tap here to answer some questions
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.push('/history')}>
-        <Text style={styles.secondary}>View History</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.footerActions}>
+        <TouchableOpacity onPress={openQuestionnaire}>
+          <Text style={styles.linkText}>Share quick feedback</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/history')}>
+          <Text style={styles.linkText}>Browse history</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 24,
     flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
     backgroundColor: Colors.background,
+    paddingHorizontal: Width * 0.06,
+    paddingTop: Height * 0.04,
   },
-  title: {
-    fontSize: Height * 0.03,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    marginBottom: 20,
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 28,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 10,
+  },
+  overline: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   transcript: {
-    fontSize: Height * 0.038,
-    textAlign: 'center',
-    marginBottom: 18,
     color: Colors.text,
+    fontSize: Height * 0.032,
+    lineHeight: 28,
+    marginTop: 18,
   },
   metadata: {
-    alignItems: 'center',
-    marginBottom: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 24,
   },
-  metaText: {
-    fontSize: 16,
-    color: '#555',
+  metaChip: {
+    backgroundColor: Colors.surfaceAlt,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  metaChipLabel: {
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 13,
   },
   audioControls: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginTop: 18,
   },
-  playButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+  audioBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    marginRight: 12,
   },
-  playText: {
-    color: Colors.white,
-    fontSize: Height * 0.03,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  button: {
+  audioBtnPrimary: {
     backgroundColor: Colors.primary,
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 24,
-    marginBottom: 10,
-    width: Width * 0.8,
   },
-  buttonText: {
+  audioBtnSecondary: {
+    backgroundColor: Colors.surfaceAlt,
+  },
+  audioBtnLabel: {
+    marginLeft: 10,
+    fontWeight: '600',
     color: Colors.white,
-    textAlign: 'center',
-    fontSize: Height * 0.03,
   },
-  questionnaire: {
-    color: Colors.primary,
-    fontSize: Height * 0.02,
-    marginTop: 10,
-    textDecorationLine: 'underline',
+  audioBtnLabelAlt: {
+    color: Colors.text,
   },
-  secondary: {
-    color: Colors.primary,
-    fontSize: Height * 0.03,
-    marginTop: 20,
+  audioNotice: {
+    marginTop: 18,
+    color: Colors.textSecondary,
+  },
+  primaryAction: {
+    backgroundColor: Colors.secondary,
+    paddingVertical: 16,
+    borderRadius: 22,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  primaryActionLabel: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  footerActions: {
+    marginTop: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  linkText: {
+    color: Colors.accent,
+    fontWeight: '600',
   },
 });
+

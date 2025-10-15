@@ -1,4 +1,4 @@
-import { FontAwesome } from '@expo/vector-icons';
+﻿import { FontAwesome } from '@expo/vector-icons';
 import type { AudioMode, RecordingOptions } from 'expo-audio';
 import {
   AudioModule,
@@ -7,6 +7,13 @@ import {
   useAudioPlayer,
   useAudioRecorder,
 } from 'expo-audio';
+
+import type { FileSystemUploadOptions } from 'expo-file-system/legacy';
+import {
+  FileSystemUploadType,
+  createUploadTask,
+} from 'expo-file-system/legacy';
+
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -19,11 +26,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import Colors from '../constants/Colors';
-import {
-  TRANSCRIPTION_TIMEOUT_MS,
-  buildTranscriptionUrl,
-} from '../constants/api';
+import { TRANSCRIPTION_TIMEOUT_MS, buildTranscriptionUrl } from '../constants/api';
 import { saveTranscript } from '../store/historyStorage';
 import PulseWave from './PulseWave';
 
@@ -37,26 +42,19 @@ type RecorderProps = {
 const Width = Dimensions.get('window').width;
 const Height = Dimensions.get('window').height;
 
-// Force a consistent 16 kHz mono capture so the ASR backend receives the expected format.
-const RECORDING_OPTIONS_16K: RecordingOptions = {
+// No explicit sample rate/channels: we record with the platform defaults.
+// The file is uploaded exactly as produced.
+const RECORDING_OPTIONS_NATIVE: RecordingOptions = {
   extension: '.m4a',
-  sampleRate: 16000,
-  numberOfChannels: 1,
-  bitRate: 64000,
   android: {
     extension: '.m4a',
-    sampleRate: 16000,
     outputFormat: 'mpeg4',
     audioEncoder: 'aac',
   },
   ios: {
     extension: '.m4a',
-    sampleRate: 16000,
     outputFormat: IOSOutputFormat.MPEG4AAC,
     audioQuality: AudioQuality.HIGH,
-    linearPCMBitDepth: 16,
-    linearPCMIsBigEndian: false,
-    linearPCMIsFloat: false,
   },
   web: {
     mimeType: 'audio/webm',
@@ -67,35 +65,32 @@ const RECORDING_OPTIONS_16K: RecordingOptions = {
 const buildAudioModeConfig = (shouldRecord: boolean): Partial<AudioMode> => {
   const common: Partial<AudioMode> = {
     allowsRecording: shouldRecord,
-    playsInSilentMode: shouldRecord,
+    playsInSilentMode: true,
     shouldPlayInBackground: false,
   };
-
-  if (Platform.OS === 'ios') {
-    return {
-      ...common,
-      interruptionMode: 'mixWithOthers',
-    };
-  }
-
+  if (Platform.OS === 'ios') return { ...common, interruptionMode: 'mixWithOthers' };
   if (Platform.OS === 'android') {
     return {
       ...common,
-      playsInSilentMode: false,
       shouldRouteThroughEarpiece: false,
       interruptionModeAndroid: shouldRecord ? 'duckOthers' : 'doNotMix',
     };
   }
-
   return common;
 };
 
-const resolveMimeType = (uri: string) => {
-  const extension = uri.split('.').pop()?.toLowerCase();
-  if (extension === 'wav') return 'audio/wav';
-  if (extension === 'aac') return 'audio/aac';
-  if (extension === 'mp3') return 'audio/mpeg';
-  return 'audio/mp4';
+const resolveMimeType = (uriOrName: string) => {
+  const extension = uriOrName.split('.').pop()?.toLowerCase();
+  switch (extension) {
+    case 'wav':  return 'audio/wav';
+    case 'aac':  return 'audio/aac';
+    case 'mp3':  return 'audio/mpeg';
+    case 'm4a':  return 'audio/m4a';
+    case 'webm': return 'audio/webm';
+    case 'ogg':  return 'audio/ogg';
+    case 'mp4':  return 'audio/mp4';
+    default:     return 'audio/mp4';
+  }
 };
 
 export default function Recorder({
@@ -104,7 +99,7 @@ export default function Recorder({
   isImpaired = false,
   etiology,
 }: RecorderProps) {
-  const audioRecorder = useAudioRecorder(RECORDING_OPTIONS_16K);
+  const audioRecorder = useAudioRecorder(RECORDING_OPTIONS_NATIVE);
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -115,81 +110,57 @@ export default function Recorder({
     () => Boolean(isImpaired && etiology && etiology !== 'null'),
     [etiology, isImpaired],
   );
-  const targetModel = useMemo(() => {
-    if(model=='whisper'){
-      model='lg'
-    }
-    const trimmed = typeof model === 'string' ? model.trim() : '';
-    console.log('the model name',trimmed)
-    return trimmed.length > 0 ? trimmed : 'lg';
-  }, [model]);
 
+  const targetModel = useMemo(() => {
+    if (model === 'whisper') return isImpaired ? 'gen-lg' : 'lg';
+    if (model === 'wav2vec') return 'wav2vec2-bert-akan-ugspeechdata-v2';
+    const trimmed = typeof model === 'string' ? model.trim() : '';
+    return trimmed.length > 0 ? trimmed : 'lg';
+  }, [isImpaired, model]);
+
+  // Permissions & audio session
   useEffect(() => {
     let cancelled = false;
-
     const configureAudioSession = async () => {
       try {
         const status = await AudioModule.requestRecordingPermissionsAsync();
         if (!status.granted) {
-          if (!cancelled) {
-            Alert.alert(
-              'Permission Required',
-              'Microphone access is needed to record audio.',
-            );
-          }
+          if (!cancelled) Alert.alert('Permission Required', 'Microphone access is needed to record audio.');
           return;
         }
-
         await AudioModule.setAudioModeAsync(buildAudioModeConfig(true));
       } catch (error) {
         if (!cancelled) {
           console.error('Failed to configure audio for recording', error);
-          Alert.alert(
-            'Audio Setup Failed',
-            'Unable to configure audio for recording. Please try again.',
-          );
+          Alert.alert('Audio Setup Failed', 'Unable to configure audio for recording. Please try again.');
         }
       }
     };
-
     configureAudioSession();
-
     return () => {
       cancelled = true;
-      AudioModule.setAudioModeAsync(buildAudioModeConfig(false)).catch(() => {
-        // ignore cleanup errors
-      });
+      AudioModule.setAudioModeAsync(buildAudioModeConfig(false)).catch(() => {});
     };
   }, []);
 
+  // Timer
   useEffect(() => {
-    if (!isRecording) {
-      setRecordingTime(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setRecordingTime((prev) => prev + 1);
-    }, 1000);
-
+    if (!isRecording) { setRecordingTime(0); return; }
+    const interval = setInterval(() => setRecordingTime((p) => p + 1), 1000);
     return () => clearInterval(interval);
   }, [isRecording]);
 
   const startRecording = useCallback(async () => {
     try {
-      if (player.isPlaying) {
-        await player.stop();
-      }
+      if (player.isPlaying) await player.stop();
       setRecordedUri(null);
-      await audioRecorder.prepareToRecordAsync();
+      await AudioModule.setAudioModeAsync(buildAudioModeConfig(true));
+      await audioRecorder.prepareToRecordAsync(RECORDING_OPTIONS_NATIVE);
       await audioRecorder.record();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording', error);
-      Alert.alert(
-        'Recording Failed',
-        'Unable to start recording. Please try again.',
-      );
+      Alert.alert('Recording Failed', 'Unable to start recording. Please try again.');
     }
   }, [audioRecorder, player]);
 
@@ -202,57 +173,100 @@ export default function Recorder({
         Alert.alert('Recording Failed', 'No recording was captured.');
         return;
       }
-
       setRecordedUri(audioRecorder.uri);
+      await AudioModule.setAudioModeAsync(buildAudioModeConfig(false));
     } catch (error) {
       console.error('Failed to stop recording', error);
-      Alert.alert(
-        'Recording Failed',
-        'Unable to stop recording. Please try again.',
-      );
+      Alert.alert('Recording Failed', 'Unable to stop recording. Please try again.');
     }
   }, [audioRecorder]);
 
-  const uploadAudio = useCallback(
+  /** Upload helper: send the recorded audio as-is */
+  const uploadRecording = useCallback(
     async (uri: string) => {
       const endpoint = buildTranscriptionUrl(targetModel, isNonStandard);
+      const payloadFields: Record<string, string> = {
+        language,
+        model: targetModel,
+        isImpaired: String(isImpaired),
+      };
+      if (etiology) payloadFields.etiology = etiology;
+
+      if (Platform.OS === 'web') {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TRANSCRIPTION_TIMEOUT_MS);
+
+        try {
+          const response = await fetch(uri);
+          const blob = await response.blob();
+
+          // keep original type/name if possible
+          const inferredName = uri.split('/').pop() ?? 'recording.webm';
+          const mimeType = blob.type || resolveMimeType(inferredName);
+          const fileName = inferredName;
+
+          const file = new File([blob], fileName, { type: mimeType });
+          const formData = new FormData();
+          formData.append('file', file);
+          Object.entries(payloadFields).forEach(([key, value]) => {
+            formData.append(key, value);
+          });
+
+          const uploadResponse = await fetch(endpoint, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          });
+
+          if (!uploadResponse.ok) {
+            const text = await uploadResponse.text().catch(() => '');
+            const details = text ? `: ${text}` : '';
+            throw new Error(`Upload failed with status ${uploadResponse.status}${details}`);
+          }
+
+          return await uploadResponse.json();
+        } catch (err) {
+          if ((err as any)?.name === 'AbortError') {
+            throw new Error('Transcription request timed out.');
+          }
+          throw err;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+
+      // Native upload — just send the produced file
       const fileName = uri.split('/').pop() ?? 'recording.m4a';
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        TRANSCRIPTION_TIMEOUT_MS,
-      );
+      const uploadOptions: FileSystemUploadOptions = {
+        httpMethod: 'POST',
+        uploadType: FileSystemUploadType?.MULTIPART ?? 1,
+        fieldName: 'file',
+        mimeType: resolveMimeType(fileName),
+        headers: { Accept: 'application/json' },
+        parameters: payloadFields,
+      };
+
+      const normalizedUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+      const uploadTask = createUploadTask(endpoint, normalizedUri, uploadOptions);
+      const timeoutId = setTimeout(() => {
+        uploadTask.cancelAsync().catch(() => {});
+      }, TRANSCRIPTION_TIMEOUT_MS);
 
       try {
-        const formData = new FormData();
-        formData.append('file', {
-          uri,
-          name: fileName,
-          type: resolveMimeType(uri),
-        } as any);
-        formData.append('language', language);
-        formData.append('model', targetModel);
-        formData.append('isImpaired', String(isImpaired));
-        if (etiology) {
-          formData.append('etiology', etiology);
+        const result = await uploadTask.uploadAsync();
+        if (!result) throw new Error('Upload task failed with no response.');
+        if (result.status < 200 || result.status >= 300) {
+          const snippet = typeof result.body === 'string' ? result.body.slice(0, 200) : '';
+          const details = snippet ? `: ${snippet}` : '';
+          throw new Error(`Upload failed with status ${result.status}${details}`);
         }
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => '');
-          const details = errorText ? `: ${errorText}` : '';
-          throw new Error(`Upload failed with status ${response.status}${details}`);
+        return JSON.parse(result.body ?? '{}');
+      } catch (err) {
+        if ((err as any)?.message?.includes('cancelled')) {
+          throw new Error('Transcription request timed out.');
         }
-
-        return await response.json();
+        throw err;
       } finally {
         clearTimeout(timeoutId);
       }
@@ -260,31 +274,26 @@ export default function Recorder({
     [etiology, isImpaired, isNonStandard, language, targetModel],
   );
 
+  /** Transcribe: upload the recorded audio as-is */
   const handleTranscription = useCallback(async () => {
     if (!recordedUri) {
-      Alert.alert(
-        'Recording Missing',
-        'Please record audio before requesting a transcription.',
-      );
+      Alert.alert('Recording Missing', 'Please record audio before requesting a transcription.');
       return;
     }
 
     try {
       setLoading(true);
-      const data = await uploadAudio(recordedUri);
-      console.log('Transcription response', data);
+      const data = await uploadRecording(recordedUri);
+      console.log(data)
 
       const transcription =
         (data as any)?.transcription ??
         (data as any)?.text ??
         (data as any)?.result;
 
-      if (!transcription) {
-        throw new Error('Transcription missing in response.');
-      }
+      if (!transcription) throw new Error('Transcription missing in response.');
 
       await saveTranscript(transcription);
-
       router.replace({
         pathname: '/result',
         params: {
@@ -308,14 +317,12 @@ export default function Recorder({
     } finally {
       setLoading(false);
     }
-  }, [etiology, isImpaired, language, recordedUri, targetModel, uploadAudio]);
+  }, [etiology, isImpaired, language, recordedUri, targetModel, uploadRecording]);
 
   const handlePlay = useCallback(async () => {
-    if (!recordedUri) {
-      return;
-    }
-
+    if (!recordedUri) return;
     try {
+      await AudioModule.setAudioModeAsync(buildAudioModeConfig(false));
       await player.play();
     } catch (error) {
       console.error('Playback failed', error);
@@ -324,11 +331,9 @@ export default function Recorder({
   }, [player, recordedUri]);
 
   const handleReplay = useCallback(async () => {
-    if (!recordedUri) {
-      return;
-    }
-
+    if (!recordedUri) return;
     try {
+      await AudioModule.setAudioModeAsync(buildAudioModeConfig(false));
       await player.seekTo(0);
       await player.play();
     } catch (error) {
@@ -356,9 +361,7 @@ export default function Recorder({
     );
   }
 
-  const minutes = Math.floor(recordingTime / 60)
-    .toString()
-    .padStart(2, '0');
+  const minutes = Math.floor(recordingTime / 60).toString().padStart(2, '0');
   const seconds = (recordingTime % 60).toString().padStart(2, '0');
 
   return (
@@ -370,11 +373,7 @@ export default function Recorder({
           accessibilityLabel={isRecording ? 'Stop recording' : 'Start recording'}
           onPress={isRecording ? stopRecording : startRecording}
         >
-          <FontAwesome
-            name={isRecording ? 'stop' : 'microphone'}
-            size={36}
-            color={Colors.white}
-          />
+          <FontAwesome name={isRecording ? 'stop' : 'microphone'} size={36} color={Colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -394,10 +393,7 @@ export default function Recorder({
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            onPress={handleTranscription}
-            style={styles.transcribeButton}
-          >
+          <TouchableOpacity onPress={handleTranscription} style={styles.transcribeButton}>
             <Text style={styles.transcribeText}>Transcribe</Text>
           </TouchableOpacity>
         </View>
@@ -408,11 +404,13 @@ export default function Recorder({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+    width: '100%',
+    backgroundColor: Colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Height * 0.024,
+    borderRadius: 28,
+    minHeight: Height * 0.45,
   },
   micWrapper: {
     justifyContent: 'center',
@@ -441,7 +439,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.secondary,
     paddingVertical: Height * 0.01,
     paddingHorizontal: Width * 0.04,
     borderRadius: 8,
@@ -454,7 +452,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   transcribeButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.accent,
     paddingVertical: Height * 0.012,
     paddingHorizontal: Width * 0.05,
     borderRadius: 10,

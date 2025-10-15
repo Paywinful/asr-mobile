@@ -12,9 +12,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/Colors';
 import { deleteTranscript, getHistory } from '../store/historyStorage';
 
+const Width = Dimensions.get('window').width;
 const Height = Dimensions.get('window').height;
 
 export default function HistoryScreen() {
@@ -49,116 +51,138 @@ export default function HistoryScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topflex}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => router.replace('/language')}
         >
-          <FontAwesome name="home" size={16} color={Colors.primary} />
-          <Text style={styles.backText}>Home</Text>
+          <FontAwesome name="chevron-left" size={14} color={Colors.text} />
+          <Text style={styles.backLabel}>Back</Text>
         </TouchableOpacity>
-
-        <Text style={styles.title}>Transcription History</Text>
+        <Text style={styles.title}>Recent transcriptions</Text>
+        <Text style={styles.caption}>
+          Tap any entry to copy it instantly. Swipe down for the latest
+          recordings.
+        </Text>
       </View>
 
       <FlatList
         data={data}
         keyExtractor={(_, i) => i.toString()}
         contentContainerStyle={
-          data.length === 0 ? styles.emptyContainer : undefined
+          data.length === 0 ? styles.emptyContainer : styles.listContent
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>No transcriptions yet</Text>
+          <Text style={styles.empty}>Your future transcriptions will appear here.</Text>
         }
         renderItem={({ item, index }) => (
           <TouchableOpacity
             onPress={() => handleCopy(item)}
             style={styles.item}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <View style={styles.itemContent}>
-              <Text style={styles.index}>{index + 1}.</Text>
-              <Text style={styles.text}>{item}</Text>
+            <View style={styles.itemHeader}>
+              <View style={styles.itemBadge}>
+                <Text style={styles.itemBadgeLabel}>{index + 1}</Text>
+              </View>
+              <TouchableOpacity onPress={() => handleDelete(index)}>
+                <FontAwesome
+                  name="trash"
+                  size={16}
+                  color={Colors.danger}
+                  style={styles.deleteIcon}
+                />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => handleDelete(index)}>
-              <Text style={styles.delete}>Delete</Text>
-            </TouchableOpacity>
+            <Text style={styles.itemText}>{item}</Text>
           </TouchableOpacity>
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 24,
     flex: 1,
     backgroundColor: Colors.background,
+    paddingHorizontal: Width * 0.06,
+    paddingTop: Height * 0.04,
+  },
+  header: {
+    marginBottom: 24,
   },
   backBtn: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#dff1ff',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: Colors.surface,
+    marginBottom: 18,
   },
-  backText: {
-    color: Colors.primary,
+  backLabel: {
+    color: Colors.text,
     fontWeight: '600',
     marginLeft: 6,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    textAlign: 'center',
+    fontSize: Height * 0.04,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  caption: {
+    color: Colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  listContent: {
+    paddingBottom: Height * 0.06,
   },
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'center',
   },
   empty: {
-    fontSize: 16,
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 60,
-    color: '#555',
+    fontSize: 16,
   },
   item: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.surfaceAlt,
+  },
+  itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    marginBottom: 12,
   },
-  itemContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
-    marginRight: 10,
+  itemBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.accent + '33',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  index: {
-    width: 24,
-    color: '#777',
-    fontSize: 16,
+  itemBadgeLabel: {
+    color: Colors.accent,
+    fontWeight: '700',
   },
-  text: {
-    fontSize: Height * 0.038,
-    flex: 1,
+  deleteIcon: {
+    padding: 4,
+  },
+  itemText: {
     color: Colors.text,
-  },
-  delete: {
-    color: Colors.danger,
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  topflex: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 35,
-    marginBottom: 20,
+    fontSize: Height * 0.028,
+    lineHeight: 24,
   },
 });
