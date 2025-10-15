@@ -1,6 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { Buffer } from 'buffer';
-import { Audio } from 'expo-av';
+import { AudioModule, useAudioPlayer, type AudioMode } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -31,6 +31,15 @@ type ChatMessage = {
 
 const Width = Dimensions.get('window').width;
 const Height = Dimensions.get('window').height;
+
+const buildPlaybackAudioMode = (): Partial<AudioMode> => ({
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: false,
+  ...(Platform.OS === 'ios'
+    ? { interruptionMode: 'mixWithOthers' as const }
+    : { interruptionModeAndroid: 'duckOthers' as const }),
+});
 
 type StackItem = { value: unknown; key?: string };
 
@@ -115,16 +124,8 @@ export default function TtsChatScreen() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const playbackPlayer = useAudioPlayer(undefined, { downloadFirst: true });
   const endpointConfigured = TTS_ENDPOINT.trim().length > 0;
-
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(() => {});
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -141,14 +142,14 @@ export default function TtsChatScreen() {
 
   const playAudio = async (uri: string) => {
     try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
+      await AudioModule.setAudioModeAsync(buildPlaybackAudioMode());
+      playbackPlayer.replace({ uri });
+      try {
+        await playbackPlayer.seekTo(0);
+      } catch {
+        // ignore seek errors (player may not support seek)
       }
-
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      soundRef.current = sound;
-      await sound.playAsync();
+      playbackPlayer.play();
     } catch (error) {
       console.error('Failed to play audio', error);
       Alert.alert('Playback failed', 'Unable to play the generated audio.');
