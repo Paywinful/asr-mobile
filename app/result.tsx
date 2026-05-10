@@ -7,6 +7,7 @@ import {
   Dimensions,
   Linking,
   Platform,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -73,6 +74,26 @@ export default function ResultScreen() {
     });
   };
 
+  const handleShareTranscript = async () => {
+    if (!transcript.trim().length) {
+      Alert.alert(
+        'Nothing to share',
+        'Generate a transcript before sharing.',
+      );
+      return;
+    }
+
+    try {
+      await Share.share({
+        message: transcript,
+        title: 'ASR Mobile Transcript',
+      });
+    } catch (err) {
+      console.error('Share error:', err);
+      Alert.alert('Share failed', 'Unable to share the transcript right now.');
+    }
+  };
+
   const handlePlay = async () => {
     if (!audioUri) {
       Alert.alert('Playback Unavailable', 'No audio was provided.');
@@ -136,6 +157,32 @@ export default function ResultScreen() {
             </View>
           ) : null}
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.shareBtn,
+            !transcript.trim().length && styles.shareBtnDisabled,
+          ]}
+          onPress={handleShareTranscript}
+          disabled={!transcript.trim().length}
+          accessibilityRole="button"
+        >
+          <FontAwesome
+            name="share-alt"
+            size={16}
+            color={
+              !transcript.trim().length ? Colors.textSecondary : Colors.white
+            }
+          />
+          <Text
+            style={[
+              styles.shareBtnLabel,
+              !transcript.trim().length && styles.shareBtnLabelDisabled,
+            ]}
+          >
+            Share transcript
+          </Text>
+        </TouchableOpacity>
 
         {audioUri ? (
           <View style={styles.audioControls}>
@@ -231,6 +278,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '600',
     fontSize: 13,
+  },
+  shareBtn: {
+    marginTop: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.accent,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+  },
+  shareBtnDisabled: {
+    backgroundColor: Colors.surfaceAlt,
+  },
+  shareBtnLabel: {
+    marginLeft: 10,
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  shareBtnLabelDisabled: {
+    color: Colors.textSecondary,
   },
   audioControls: {
     flexDirection: 'row',

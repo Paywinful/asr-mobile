@@ -11,6 +11,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -111,6 +112,36 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
   return globalThis?.btoa ? globalThis.btoa(binary) : '';
 };
 
+const ensureShareableAudioUri = async (audioUri: string) => {
+  if (!audioUri) return undefined;
+
+  const cacheDir = FileSystem.cacheDirectory ?? '';
+  const isFileUri =
+    audioUri.startsWith('file://') || audioUri.startsWith(cacheDir);
+  if (isFileUri) {
+    return audioUri;
+  }
+
+  if (audioUri.startsWith('data:audio/')) {
+    const extension = inferExtension(audioUri);
+    const fileUri = `${cacheDir}tts-share-${Date.now()}.${extension}`;
+    await FileSystem.writeAsStringAsync(fileUri, stripDataUrlPrefix(audioUri), {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return fileUri;
+  }
+
+  if (audioUri.startsWith('http')) {
+    const httpExtMatch = audioUri.match(/\.([a-z0-9]+)(?:[?#]|$)/i);
+    const extension = httpExtMatch?.[1] ?? 'mp3';
+    const fileUri = `${cacheDir}tts-share-${Date.now()}.${extension}`;
+    const { uri } = await FileSystem.downloadAsync(audioUri, fileUri);
+    return uri;
+  }
+
+  return audioUri;
+};
+
 export default function TtsChatScreen() {
   const { seed } = useLocalSearchParams<{ seed?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -153,6 +184,30 @@ export default function TtsChatScreen() {
     } catch (error) {
       console.error('Failed to play audio', error);
       Alert.alert('Playback failed', 'Unable to play the generated audio.');
+    }
+  };
+
+  const shareAssistantAudio = async (message: ChatMessage) => {
+    if (!message.audioUri) {
+      Alert.alert('Share unavailable', 'No audio response is ready yet.');
+      return;
+    }
+
+    try {
+      const localUri = await ensureShareableAudioUri(message.audioUri);
+      if (!localUri) {
+        throw new Error('Unable to resolve audio file for sharing.');
+      }
+
+      const trimmed = message.text.trim();
+      await Share.share({
+        url: localUri,
+        message: trimmed.length ? trimmed : undefined,
+        title: 'ASR Mobile Voice Reply',
+      });
+    } catch (error) {
+      console.error('Share audio error:', error);
+      Alert.alert('Share failed', 'Unable to share the audio right now.');
     }
   };
 
@@ -379,6 +434,8 @@ export default function TtsChatScreen() {
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';
+    const canShare =
+      !isUser && Boolean(item.audioUri) && item.status === 'ready';
     return (
       <View
         style={[
@@ -400,14 +457,27 @@ export default function TtsChatScreen() {
             <Text style={styles.loaderText}>Preparing audio</Text>
           </View>
         ) : null}
-        {!isUser && item.audioUri ? (
-          <TouchableOpacity
-            style={styles.playChip}
-            onPress={() => playAudio(item.audioUri!)}
-          >
-            <FontAwesome name="play" size={12} color={Colors.white} />
-            <Text style={styles.playChipLabel}>Listen</Text>
-          </TouchableOpacity>
+        {!isUser ? (
+          <View style={styles.assistantActions}>
+            {item.audioUri ? (
+              <TouchableOpacity
+                style={styles.playChip}
+                onPress={() => playAudio(item.audioUri!)}
+              >
+                <FontAwesome name="play" size={12} color={Colors.white} />
+                <Text style={styles.playChipLabel}>Listen</Text>
+              </TouchableOpacity>
+            ) : null}
+            {canShare ? (
+              <TouchableOpacity
+                style={styles.shareChip}
+                onPress={() => shareAssistantAudio(item)}
+              >
+                <FontAwesome name="share-alt" size={12} color={Colors.text} />
+                <Text style={styles.shareChipLabel}>Share audio</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
       </View>
     );
@@ -574,19 +644,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.4,
   },
+  assistantActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
   playChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginTop: 12,
     backgroundColor: Colors.primary,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
+    marginRight: 8,
   },
   playChipLabel: {
     marginLeft: 6,
     color: Colors.white,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  shareChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceAlt,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    marginLeft: 8,
+  },
+  shareChipLabel: {
+    marginLeft: 6,
+    color: Colors.text,
     fontWeight: '600',
     fontSize: 12,
   },

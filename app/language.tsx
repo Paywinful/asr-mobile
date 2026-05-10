@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/Colors';
 
-const languages = ['AKAN', 'EWE', 'DAGBANI', 'DAGAARE', 'IKPOSO'];
+const languages = ['AKAN', 'GA', 'EWE', 'DAGBANI', 'DAGAARE', 'IKPOSO'];
 
 const Width = Dimensions.get('window').width;
 const Height = Dimensions.get('window').height;

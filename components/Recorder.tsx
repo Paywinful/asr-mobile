@@ -106,17 +106,12 @@ export default function Recorder({
   const [recordingTime, setRecordingTime] = useState(0);
   const player = useAudioPlayer(recordedUri ?? undefined);
 
-  const isNonStandard = useMemo(
-    () => Boolean(isImpaired && etiology && etiology !== 'null'),
-    [etiology, isImpaired],
-  );
-
-  const targetModel = useMemo(() => {
-    if (model === 'whisper') return isImpaired ? 'gen-lg' : 'lg';
-    if (model === 'wav2vec') return 'wav2vec2-bert-akan-ugspeechdata-v2';
-    const trimmed = typeof model === 'string' ? model.trim() : '';
-    return trimmed.length > 0 ? trimmed : 'lg';
-  }, [isImpaired, model]);
+  const selectedModel = useMemo(() => {
+    const trimmed = typeof model === 'string' ? model.trim().toLowerCase() : '';
+    if (trimmed.includes('wav2vec')) return 'wav2vec';
+    if (trimmed.includes('whisper')) return 'whisper';
+    return isImpaired || etiology ? 'whisper' : 'wav2vec';
+  }, [etiology, isImpaired, model]);
 
   // Permissions & audio session
   useEffect(() => {
@@ -184,13 +179,14 @@ export default function Recorder({
   /** Upload helper: send the recorded audio as-is */
   const uploadRecording = useCallback(
     async (uri: string) => {
-      const endpoint = buildTranscriptionUrl(targetModel, isNonStandard);
-      const payloadFields: Record<string, string> = {
-        language,
-        model: targetModel,
-        isImpaired: String(isImpaired),
-      };
-      if (etiology) payloadFields.etiology = etiology;
+      const endpoint = buildTranscriptionUrl(selectedModel);
+      const payloadFields: Record<string, string> = { language };
+      const normalizedEtiology =
+        etiology && etiology !== 'null' ? etiology : '';
+      if (selectedModel === 'whisper') {
+        payloadFields.isImpaired = String(isImpaired);
+        payloadFields.etiology = normalizedEtiology;
+      }
 
       if (Platform.OS === 'web') {
         const controller = new AbortController();
@@ -271,7 +267,7 @@ export default function Recorder({
         clearTimeout(timeoutId);
       }
     },
-    [etiology, isImpaired, isNonStandard, language, targetModel],
+    [etiology, isImpaired, language, selectedModel],
   );
 
   /** Transcribe: upload the recorded audio as-is */
@@ -299,7 +295,7 @@ export default function Recorder({
         params: {
           transcript: transcription,
           language,
-          model: targetModel,
+          model: selectedModel,
           audioUri: recordedUri,
           isImpaired: String(isImpaired),
           etiology: etiology ?? '',
@@ -317,7 +313,7 @@ export default function Recorder({
     } finally {
       setLoading(false);
     }
-  }, [etiology, isImpaired, language, recordedUri, targetModel, uploadRecording]);
+  }, [etiology, isImpaired, language, recordedUri, selectedModel, uploadRecording]);
 
   const handlePlay = useCallback(async () => {
     if (!recordedUri) return;
@@ -342,7 +338,7 @@ export default function Recorder({
     }
   }, [player, recordedUri]);
 
-  if (!language || !targetModel) {
+  if (!language || !selectedModel) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>
